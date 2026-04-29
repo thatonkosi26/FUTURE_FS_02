@@ -1,10 +1,681 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta http-equiv="refresh" content="0; url=login.html"/>
-  <title>ClientIQ</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ClientIQ — AI-Powered CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #9AE600;
+      --accent-dim: #7DBF00;
+      --accent-soft: rgba(154,230,0,0.10);
+      --accent-glow: rgba(154,230,0,0.25);
+      --bg: #0C0C0A;
+      --bg-2: #131311;
+      --bg-3: #1A1A17;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-2: rgba(255,255,255,0.05);
+      --text: #F5F5F2;
+      --text-2: rgba(245,245,242,0.55);
+      --text-3: rgba(245,245,242,0.30);
+      --font: 'Geist', system-ui, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+      --r: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px;
+      --ease: cubic-bezier(0.4,0,0.2,1);
+    }
+    html { font-size: 15px; -webkit-font-smoothing: antialiased; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+    /* ── Loading screen ── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 28px;
+      transition: opacity 0.5s var(--ease), visibility 0.5s;
+    }
+    #loading-screen.fade-out { opacity: 0; visibility: hidden; }
+
+    .loader-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.2rem; font-weight: 800; letter-spacing: -0.03em;
+      opacity: 0; animation: fadeUp 0.5s 0.1s var(--ease) forwards;
+    }
+    .loader-logo-icon {
+      width: 34px; height: 34px; background: var(--accent);
+      border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    }
+    .loader-logo-icon svg { width: 17px; height: 17px; }
+
+    .loader-bar-wrap {
+      width: 180px; height: 3px; background: var(--border);
+      border-radius: 10px; overflow: hidden;
+      opacity: 0; animation: fadeUp 0.5s 0.25s var(--ease) forwards;
+    }
+    .loader-bar {
+      height: 100%; width: 0%; background: var(--accent);
+      border-radius: 10px;
+      animation: loadBar 1.8s 0.4s var(--ease) forwards;
+    }
+    @keyframes loadBar {
+      0%   { width: 0%; }
+      40%  { width: 55%; }
+      70%  { width: 78%; }
+      90%  { width: 92%; }
+      100% { width: 100%; }
+    }
+    .loader-status {
+      font-size: 0.78rem; color: var(--text-3); letter-spacing: 0.01em;
+      opacity: 0; animation: fadeUp 0.5s 0.35s var(--ease) forwards;
+      font-family: var(--font-mono);
+    }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ── Noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+
+    /* ── Glow orbs ── */
+    .orb {
+      position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+      filter: blur(80px); opacity: 0.18;
+    }
+    .orb-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; right: -150px; animation: floatOrb 12s ease-in-out infinite; }
+    .orb-2 { width: 400px; height: 400px; background: #3B82F6; bottom: -100px; left: -100px; animation: floatOrb 16s 2s ease-in-out infinite reverse; opacity: 0.1; }
+    .orb-3 { width: 300px; height: 300px; background: var(--accent); top: 50%; left: 40%; transform: translate(-50%,-50%); animation: floatOrb 20s 4s ease-in-out infinite; opacity: 0.06; }
+    @keyframes floatOrb {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33% { transform: translate(30px,-20px) scale(1.05); }
+      66% { transform: translate(-20px,15px) scale(0.97); }
+    }
+
+    /* ── Main wrapper ── */
+    #main-content { position: relative; z-index: 1; opacity: 0; transition: opacity 0.6s var(--ease); }
+    #main-content.visible { opacity: 1; }
+
+    /* ── Nav ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 48px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(12,12,10,0.7);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 9px; font-size: 1rem; font-weight: 800; letter-spacing: -0.03em; }
+    .nav-logo-icon { width: 30px; height: 30px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .nav-logo-icon svg { width: 15px; height: 15px; }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link { padding: 7px 14px; border-radius: var(--r); font-size: 0.845rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: all 0.15s var(--ease); text-decoration: none; }
+    .nav-link:hover { color: var(--text); background: var(--surface); }
+    .nav-cta { padding: 8px 18px; background: var(--accent); color: #000; font-weight: 700; font-size: 0.845rem; border-radius: var(--r); cursor: pointer; transition: all 0.15s var(--ease); text-decoration: none; border: none; }
+    .nav-cta:hover { background: var(--accent-dim); transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 100px 48px 80px;
+      max-width: 900px; margin: 0 auto;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 12px; border-radius: 20px;
+      background: var(--accent-soft); border: 1px solid rgba(154,230,0,0.2);
+      font-size: 0.78rem; font-weight: 600; color: var(--accent-dim);
+      margin-bottom: 28px; letter-spacing: 0.01em;
+      animation: fadeUp 0.6s 0.1s var(--ease) both;
+    }
+    .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.85); } }
+
+    .hero h1 {
+      font-size: clamp(2.8rem, 6vw, 4.8rem); font-weight: 900;
+      letter-spacing: -0.05em; line-height: 1.05;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s 0.2s var(--ease) both;
+    }
+    .hero h1 .accent { color: var(--accent); }
+    .hero h1 .dim { color: var(--text-2); }
+
+    .hero-sub {
+      font-size: 1.05rem; color: var(--text-2); line-height: 1.7;
+      max-width: 560px; margin: 0 auto 40px;
+      animation: fadeUp 0.6s 0.3s var(--ease) both;
+    }
+
+    .hero-actions {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.4s var(--ease) both;
+    }
+    .btn-hero-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 26px; background: var(--accent); color: #000;
+      font-weight: 800; font-size: 0.925rem; border-radius: var(--r-md);
+      cursor: pointer; transition: all 0.15s var(--ease);
+      border: none; text-decoration: none; letter-spacing: -0.01em;
+    }
+    .btn-hero-primary:hover { background: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 8px 28px var(--accent-glow); }
+    .btn-hero-primary svg { width: 16px; height: 16px; }
+    .btn-hero-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 24px; color: var(--text-2);
+      font-weight: 600; font-size: 0.925rem; border-radius: var(--r-md);
+      cursor: pointer; transition: all 0.15s var(--ease);
+      border: 1px solid var(--border); background: var(--surface);
+      text-decoration: none; backdrop-filter: blur(8px);
+    }
+    .btn-hero-secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); }
+    .btn-hero-secondary svg { width: 16px; height: 16px; }
+
+    /* ── Live stats bar ── */
+    .stats-bar {
+      margin: 64px auto 0; max-width: 800px; padding: 0 48px;
+      animation: fadeUp 0.6s 0.5s var(--ease) both;
+    }
+    .stats-bar-inner {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+    }
+    .stat-item {
+      padding: 24px 20px;
+      border-right: 1px solid var(--border);
+      text-align: center; position: relative;
+      transition: background 0.15s var(--ease);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-item:hover { background: rgba(154,230,0,0.04); }
+    .stat-item-value {
+      font-size: 1.7rem; font-weight: 900;
+      letter-spacing: -0.04em; color: var(--text);
+      line-height: 1; margin-bottom: 5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-item-value.loading-val { color: var(--text-3); font-size: 1.2rem; }
+    .stat-item-value .accent { color: var(--accent); }
+    .stat-item-label { font-size: 0.72rem; color: var(--text-3); font-weight: 500; letter-spacing: 0.02em; }
+    .stat-item-delta {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 0.68rem; font-weight: 700; color: var(--accent-dim);
+      background: var(--accent-soft); padding: 2px 6px; border-radius: 4px;
+      margin-top: 6px;
+    }
+    .stat-loading-bar {
+      position: absolute; bottom: 0; left: 0; height: 2px;
+      background: var(--accent); border-radius: 0 0 0 0;
+      animation: shimmer 1.5s ease-in-out infinite;
+      opacity: 0;
+      width: 100%;
+    }
+    .stat-item.fetching .stat-loading-bar { opacity: 1; }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* ── Features ── */
+    .features { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-3);
+      margin-bottom: 16px;
+    }
+    .section-label::before { content: ''; width: 16px; height: 1px; background: var(--text-3); }
+    .features h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 800;
+      letter-spacing: -0.04em; line-height: 1.15;
+      margin-bottom: 56px; max-width: 500px;
+    }
+    .features h2 em { font-style: normal; color: var(--accent); }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+    .feature-card {
+      background: var(--bg-2); padding: 28px;
+      transition: background 0.15s var(--ease);
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--accent-soft) 0%, transparent 60%);
+      opacity: 0; transition: opacity 0.2s var(--ease);
+    }
+    .feature-card:hover { background: var(--bg-3); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 38px; height: 38px; border-radius: var(--r);
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px; color: var(--accent);
+      position: relative; z-index: 1;
+    }
+    .feature-icon svg { width: 17px; height: 17px; }
+    .feature-card h3 { font-size: 0.925rem; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; position: relative; z-index: 1; }
+    .feature-card p { font-size: 0.82rem; color: var(--text-2); line-height: 1.65; position: relative; z-index: 1; }
+
+    /* ── Activity feed preview ── */
+    .preview-section { padding: 0 48px 100px; max-width: 1100px; margin: 0 auto; }
+    .preview-card {
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: 32px; overflow: hidden;
+      position: relative;
+    }
+    .preview-card::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+    .preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .preview-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); display: flex; align-items: center; gap: 7px; }
+    .preview-title svg { width: 12px; height: 12px; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px;
+      background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
+      font-size: 0.7rem; font-weight: 700; color: #10B981;
+    }
+    .live-dot { width: 5px; height: 5px; border-radius: 50%; background: #10B981; animation: pulse 1.5s infinite; }
+
+    .feed-list { display: flex; flex-direction: column; gap: 0; }
+    .feed-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 0; border-bottom: 1px solid var(--border-2);
+      animation: feedIn 0.4s var(--ease) both;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    @keyframes feedIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
+    .feed-avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 800; color: #000;
+    }
+    .feed-text { flex: 1; font-size: 0.82rem; color: var(--text-2); line-height: 1.4; }
+    .feed-text strong { color: var(--text); font-weight: 600; }
+    .feed-time { font-size: 0.7rem; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; }
+    .feed-status {
+      font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+      white-space: nowrap;
+    }
+    .fs-new       { color: #7DBF00; background: rgba(154,230,0,0.1); }
+    .fs-contacted { color: #3B82F6; background: rgba(59,130,246,0.1); }
+    .fs-converted { color: #10B981; background: rgba(16,185,129,0.1); }
+    .fs-proposal  { color: #F59E0B; background: rgba(245,158,11,0.1); }
+
+    /* ── CTA ── */
+    .cta-section {
+      padding: 80px 48px 100px; text-align: center;
+      max-width: 700px; margin: 0 auto;
+    }
+    .cta-section h2 {
+      font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 900;
+      letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 18px;
+    }
+    .cta-section h2 em { font-style: normal; color: var(--accent); }
+    .cta-section p { font-size: 0.95rem; color: var(--text-2); margin-bottom: 36px; line-height: 1.6; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.78rem; color: var(--text-3);
+    }
+    .footer-logo { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--text-2); }
+    .footer-logo-icon { width: 22px; height: 22px; background: var(--accent); border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+    .footer-logo-icon svg { width: 11px; height: 11px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+      .hero { padding: 60px 20px 50px; }
+      .stats-bar { padding: 0 20px; }
+      .stats-bar-inner { grid-template-columns: repeat(2, 1fr); }
+      .stat-item:nth-child(2) { border-right: none; }
+      .features { padding: 60px 20px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .preview-section { padding: 0 20px 60px; }
+      .cta-section { padding: 60px 20px; }
+      footer { padding: 20px; flex-direction: column; gap: 8px; text-align: center; }
+    }
+  </style>
 </head>
 <body>
-  <p>Redirecting… <a href="login.html">Click here</a></p>
+
+<!-- ── Loading Screen ── -->
+<div id="loading-screen">
+  <div class="loader-logo">
+    <div class="loader-logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    ClientIQ
+  </div>
+  <div class="loader-bar-wrap">
+    <div class="loader-bar" id="loader-bar"></div>
+  </div>
+  <div class="loader-status" id="loader-status">Initializing…</div>
+</div>
+
+<!-- ── Orbs ── -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- ── Main Content ── -->
+<div id="main-content">
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-logo">
+      <div class="nav-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      ClientIQ
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="#features">Features</a>
+      <a class="nav-link" href="#activity">Activity</a>
+      <a class="nav-link" href="login.html">Sign In</a>
+    </div>
+    <a class="nav-cta" href="login.html">Open Dashboard →</a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      AI-Powered Lead Management
+    </div>
+    <h1>
+      Close more deals<br/>
+      <span class="dim">with</span> <span class="accent">smarter</span> CRM
+    </h1>
+    <p class="hero-sub">
+      ClientIQ gives your sales team a real-time view of every lead, every deal, and every opportunity — all in one clean dashboard.
+    </p>
+    <div class="hero-actions">
+      <a class="btn-hero-primary" href="login.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Go to Dashboard
+      </a>
+      <a class="btn-hero-secondary" href="#features">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        See Features
+      </a>
+    </div>
+  </section>
+
+  <!-- Live Stats Bar -->
+  <div class="stats-bar">
+    <div class="stats-bar-inner">
+      <div class="stat-item fetching" id="si-total">
+        <div class="stat-item-value loading-val" id="sv-total">—</div>
+        <div class="stat-item-label">Total Leads</div>
+        <div class="stat-loading-bar"></div>
+      </div>
+      <div class="stat-item fetching" id="si-converted">
+        <div class="stat-item-value loading-val" id="sv-converted">—</div>
+        <div class="stat-item-label">Converted</div>
+        <div class="stat-loading-bar"></div>
+      </div>
+      <div class="stat-item fetching" id="si-rate">
+        <div class="stat-item-value loading-val" id="sv-rate">—</div>
+        <div class="stat-item-label">Conversion Rate</div>
+        <div class="stat-loading-bar"></div>
+      </div>
+      <div class="stat-item fetching" id="si-active">
+        <div class="stat-item-value loading-val" id="sv-active">—</div>
+        <div class="stat-item-label">Active Deals</div>
+        <div class="stat-loading-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <div class="section-label">Features</div>
+    <h2>Everything your<br/>team needs to <em>win</em></h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Lead Management</h3>
+        <p>Capture, track, and manage every lead from first touch to close. Full contact history in one place.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        </div>
+        <h3>Pipeline Tracking</h3>
+        <p>Visualize your entire funnel — New, Contacted, Proposal, Converted. Update status in one click.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>Activity Notes</h3>
+        <p>Log calls, emails, meetings and notes against any lead. Never lose context on a conversation again.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Live Analytics</h3>
+        <p>Real-time conversion rates, revenue tracking and pipeline insights pulled directly from your data.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Secure by Default</h3>
+        <p>JWT authentication, bcrypt password hashing, and protected API routes keep your data safe.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3>CSV Export</h3>
+        <p>Export your entire lead database to CSV with one click. Your data, your way, always.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Activity Preview -->
+  <section class="preview-section" id="activity">
+    <div class="preview-card">
+      <div class="preview-header">
+        <div class="preview-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Live Activity Feed
+        </div>
+        <div class="live-badge"><div class="live-dot"></div>Live</div>
+      </div>
+      <div class="feed-list" id="feed-list">
+        <div style="color:rgba(245,245,242,0.3);font-size:0.8rem;padding:12px 0">Loading activity…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <h2>Ready to <em>close</em><br/>more deals?</h2>
+    <p>Sign in and start managing your leads in under 60 seconds. No setup required.</p>
+    <a class="btn-hero-primary" href="login.html" style="display:inline-flex;margin:0 auto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Get Started Free
+    </a>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-logo">
+      <div class="footer-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      ClientIQ
+    </div>
+    <span>Built with Node.js, Express & MongoDB</span>
+    <span id="footer-year"></span>
+  </footer>
+
+</div><!-- /#main-content -->
+
+<script>
+  const API_BASE = 'https://future-fs-02-9m4i.onrender.com/api';
+  const AVATAR_COLORS = ['#9AE600','#3B82F6','#F59E0B','#10B981','#8B5CF6','#EC4899'];
+  const STATUS_CLASSES = { new:'fs-new', contacted:'fs-contacted', converted:'fs-converted', proposal:'fs-proposal', lost:'fs-new' };
+  const STATUS_LABELS  = { new:'New', contacted:'Contacted', converted:'Converted', proposal:'Proposal', lost:'Lost' };
+
+  document.getElementById('footer-year').textContent = `© ${new Date().getFullYear()} ClientIQ`;
+
+  // ── Loading sequence ──
+  const statusMessages = ['Initializing…', 'Connecting to API…', 'Fetching live data…', 'Rendering dashboard…'];
+  let msgIdx = 0;
+  const statusEl = document.getElementById('loader-status');
+  const msgInterval = setInterval(() => {
+    msgIdx = Math.min(msgIdx + 1, statusMessages.length - 1);
+    statusEl.textContent = statusMessages[msgIdx];
+  }, 500);
+
+  async function boot() {
+    // Fetch real data in parallel
+    let stats = null, leads = [];
+    try {
+      const token = localStorage.getItem('ciq_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/leads`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        stats = data.stats;
+        leads = data.leads || [];
+      }
+    } catch (_) { /* API offline — show zeros */ }
+
+    clearInterval(msgInterval);
+    statusEl.textContent = 'Ready!';
+
+    // Short pause so "Ready!" is visible
+    await new Promise(r => setTimeout(r, 400));
+
+    // Hide loader
+    document.getElementById('loading-screen').classList.add('fade-out');
+    document.getElementById('main-content').classList.add('visible');
+
+    // Animate stats in
+    setTimeout(() => renderStats(stats, leads), 300);
+    setTimeout(() => renderFeed(leads), 600);
+  }
+
+  function animateCount(el, target, suffix = '', duration = 900) {
+    const start = performance.now();
+    const from = 0;
+    function step(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3); // ease-out-cubic
+      el.textContent = Math.round(from + (target - from) * ease) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function renderStats(stats, leads) {
+    const total     = stats?.total      ?? 0;
+    const converted = stats?.converted  ?? 0;
+    const newLeads  = stats?.newLeads   ?? 0;
+    const contacted = stats?.contacted  ?? 0;
+    const active    = newLeads + contacted + (stats?.proposal ?? 0);
+    const rate      = total > 0 ? +((converted / total) * 100).toFixed(1) : 0;
+
+    // Stop shimmer
+    ['si-total','si-converted','si-rate','si-active'].forEach(id => {
+      document.getElementById(id)?.classList.remove('fetching');
+    });
+
+    // Animate
+    const tv = document.getElementById('sv-total');
+    const cv = document.getElementById('sv-converted');
+    const rv = document.getElementById('sv-rate');
+    const av = document.getElementById('sv-active');
+
+    [tv, cv, rv, av].forEach(el => el.classList.remove('loading-val'));
+
+    animateCount(tv, total);
+    animateCount(cv, converted);
+
+    // Rate animates with %
+    const rateStart = performance.now();
+    (function stepRate(now) {
+      const p = Math.min((now - rateStart) / 900, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      rv.textContent = (rate * ease).toFixed(1) + '%';
+      if (p < 1) requestAnimationFrame(stepRate);
+    })(rateStart);
+
+    animateCount(av, active);
+
+    // Add delta badges
+    if (total > 0) {
+      tv.insertAdjacentHTML('afterend', `<div class="stat-item-delta">↑ Active pipeline</div>`);
+      rv.insertAdjacentHTML('afterend', `<div class="stat-item-delta">↑ Live data</div>`);
+    }
+
+    // Update hero subtext with real stat
+    const activeRatio = total > 0 ? Math.round((active / total) * 100) : 0;
+    const heroSub = document.querySelector('.hero-sub');
+    if (heroSub && total > 0) {
+      heroSub.innerHTML = `ClientIQ gives your sales team a real-time view of every lead, every deal, and every opportunity — all in one clean dashboard. <strong style="color:var(--text)">${activeRatio}% of your leads</strong> have active deal activity right now.`;
+    }
+  }
+
+  function getInitials(name) {
+    return name.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase();
+  }
+
+  function timeAgo(date) {
+    const s = (Date.now() - new Date(date)) / 1000;
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+    return `${Math.floor(s/86400)}d ago`;
+  }
+
+  function renderFeed(leads) {
+    const el = document.getElementById('feed-list');
+    if (!leads || leads.length === 0) {
+      el.innerHTML = `<div style="color:rgba(245,245,242,0.3);font-size:0.82rem;padding:16px 0;text-align:center">No leads yet — <a href="login.html" style="color:var(--accent)">add your first lead</a></div>`;
+      return;
+    }
+    // Sort by newest, take up to 6
+    const sorted = [...leads].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+    el.innerHTML = sorted.map((lead, i) => {
+      const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+      const sc = STATUS_CLASSES[lead.status] || 'fs-new';
+      const sl = STATUS_LABELS[lead.status] || lead.status;
+      return `
+        <div class="feed-item" style="animation-delay:${i*80}ms">
+          <div class="feed-avatar" style="background:${color};color:${color === '#9AE600' ? '#000' : '#fff'}">${getInitials(lead.name)}</div>
+          <div class="feed-text"><strong>${lead.name}</strong>${lead.company ? ` · ${lead.company}` : ''} joined as a lead</div>
+          <span class="feed-status ${sc}">${sl}</span>
+          <div class="feed-time">${timeAgo(lead.createdAt)}</div>
+        </div>`;
+    }).join('');
+  }
+
+  boot();
+</script>
 </body>
 </html>

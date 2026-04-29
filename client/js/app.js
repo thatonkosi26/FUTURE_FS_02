@@ -2,7 +2,7 @@
    app.js — Main Application Logic
    ========================================== */
 
-   const API_BASE = 'http://localhost:5000/api';
+   const API_BASE = 'https://future-fs-02-9m4i.onrender.com/api';
 
    const App = (() => {
      let allLeads = [];
