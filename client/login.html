@@ -22,9 +22,24 @@
       <p>The all-in-one CRM for modern sales teams. Track every lead, follow up effortlessly, close more deals.</p>
     </div>
     <div class="brand-metrics">
-      <div class="brand-metric"><div class="brand-metric-val">1.2k+</div><div class="brand-metric-lbl">Active Leads</div></div>
-      <div class="brand-metric"><div class="brand-metric-val">32.5%</div><div class="brand-metric-lbl">Conversion Rate</div></div>
-      <div class="brand-metric"><div class="brand-metric-val">$12.5M</div><div class="brand-metric-lbl">Revenue Tracked</div></div>
+      <div class="brand-metric">
+        <div class="brand-metric-val" id="bm-total">
+          <span class="bm-skeleton">—</span>
+        </div>
+        <div class="brand-metric-lbl">Total Leads</div>
+      </div>
+      <div class="brand-metric">
+        <div class="brand-metric-val" id="bm-rate">
+          <span class="bm-skeleton">—</span>
+        </div>
+        <div class="brand-metric-lbl">Conversion Rate</div>
+      </div>
+      <div class="brand-metric">
+        <div class="brand-metric-val" id="bm-active">
+          <span class="bm-skeleton">—</span>
+        </div>
+        <div class="brand-metric-lbl">Active Pipeline</div>
+      </div>
     </div>
   </div>
 
@@ -105,5 +120,90 @@
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
+
+<style>
+  @keyframes bm-pulse { 0%,100%{opacity:.35} 50%{opacity:.7} }
+  .bm-skeleton { animation: bm-pulse 1.4s ease-in-out infinite; }
+  @keyframes bm-countup { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .bm-live { animation: bm-countup 0.4s ease both; }
+  .brand-metric { position: relative; overflow: hidden; }
+  .brand-metric::after {
+    content: ''; position: absolute; bottom: 0; left: 0;
+    height: 1px; width: 0%; background: #9AE600;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+  .brand-metric.loaded::after { width: 100%; }
+</style>
+<script>
+  (async function fetchLoginStats() {
+    const API_BASE = 'http://localhost:5000/api';
+
+    function animateCount(el, target, format) {
+      el.innerHTML = '';
+      const span = document.createElement('span');
+      span.className = 'bm-live';
+      el.appendChild(span);
+      const duration = 900;
+      const start = performance.now();
+      function step(now) {
+        const p = Math.min((now - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        span.textContent = format(Math.round(target * ease), target * ease);
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      el.closest('.brand-metric').classList.add('loaded');
+    }
+
+    function formatTotal(v) {
+      if (v >= 1000) return (v/1000).toFixed(1) + 'k';
+      return String(v);
+    }
+
+    try {
+      // Try with token if available
+      const token = localStorage.getItem('ciq_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const res = await fetch(API_BASE + '/leads', { headers });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const s = data.stats || {};
+      const total     = s.total     || 0;
+      const converted = s.converted || 0;
+      const newL      = s.newLeads  || 0;
+      const contacted = s.contacted || 0;
+      const proposal  = s.proposal  || 0;
+      const active    = newL + contacted + proposal;
+      const rate      = total > 0 ? +((converted / total) * 100).toFixed(1) : 0;
+
+      // Stagger animations
+      setTimeout(() => animateCount(document.getElementById('bm-total'),  total, v => formatTotal(v)), 100);
+      setTimeout(() => {
+        const rateEl = document.getElementById('bm-rate');
+        rateEl.innerHTML = '';
+        const span = document.createElement('span');
+        span.className = 'bm-live';
+        rateEl.appendChild(span);
+        const dur = 900, st = performance.now();
+        (function step(now) {
+          const p = Math.min((now - st) / dur, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          span.textContent = (rate * ease).toFixed(1) + '%';
+          if (p < 1) requestAnimationFrame(step);
+        })(performance.now());
+        rateEl.closest('.brand-metric').classList.add('loaded');
+      }, 250);
+      setTimeout(() => animateCount(document.getElementById('bm-active'), active, v => String(v)), 400);
+
+    } catch (_) {
+      // API offline — show dashes gracefully, no error shown to user
+      ['bm-total','bm-rate','bm-active'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.innerHTML = '<span style="font-size:1rem;opacity:0.3">—</span>'; }
+      });
+    }
+  })();
+</script>
+
 </body>
 </html>
