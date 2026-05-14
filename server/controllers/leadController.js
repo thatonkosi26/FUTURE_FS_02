@@ -67,3 +67,23 @@ exports.deleteLead = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getPublicStats = async (req, res, next) => {
+  try {
+    const total     = await Lead.countDocuments();
+    const converted = await Lead.countDocuments({ status: 'converted' });
+    const newLeads  = await Lead.countDocuments({ status: 'new' });
+    const contacted = await Lead.countDocuments({ status: 'contacted' });
+    const proposal  = await Lead.countDocuments({ status: 'proposal' });
+
+    res.json({
+      success: true,
+      stats: {
+        total, converted, newLeads, contacted, proposal,
+        conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : 0
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};

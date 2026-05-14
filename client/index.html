@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ClientIQ — CRM</title>
+  <title>ClientIQ — AI-Powered CRM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -397,7 +397,7 @@
   <section class="hero">
     <div class="hero-badge">
       <span class="hero-badge-dot"></span>
-      Lead Management
+      AI-Powered Lead Management
     </div>
     <h1>
       Close more deals<br/>
@@ -535,7 +535,7 @@
 </div><!-- /#main-content -->
 
 <script>
-  const API_BASE = 'https://future-fs-02-9m4i.onrender.com/api';
+  const API_BASE = 'http://localhost:5000/api';
   const AVATAR_COLORS = ['#9AE600','#3B82F6','#F59E0B','#10B981','#8B5CF6','#EC4899'];
   const STATUS_CLASSES = { new:'fs-new', contacted:'fs-contacted', converted:'fs-converted', proposal:'fs-proposal', lost:'fs-new' };
   const STATUS_LABELS  = { new:'New', contacted:'Contacted', converted:'Converted', proposal:'Proposal', lost:'Lost' };
@@ -555,13 +555,22 @@
     // Fetch real data in parallel
     let stats = null, leads = [];
     try {
-      const token = localStorage.getItem('ciq_token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const res = await fetch(`${API_BASE}/leads`, { headers });
+      // Public endpoint — no token needed
+      const res = await fetch(`${API_BASE}/leads/stats`);
       if (res.ok) {
         const data = await res.json();
         stats = data.stats;
-        leads = data.leads || [];
+        // Activity feed: fetch leads only if logged in
+        const token = localStorage.getItem('ciq_token');
+        if (token) {
+          const leadsRes = await fetch(`${API_BASE}/leads`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (leadsRes.ok) {
+            const leadsData = await leadsRes.json();
+            leads = leadsData.leads || [];
+          }
+        }
       }
     } catch (_) { /* API offline — show zeros */ }
 

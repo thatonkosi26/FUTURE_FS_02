@@ -162,9 +162,8 @@
 
     try {
       // Try with token if available
-      const token = localStorage.getItem('ciq_token');
-      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-      const res = await fetch(API_BASE + '/leads', { headers });
+      // Public endpoint — no token needed
+      const res = await fetch(API_BASE + '/leads/stats');
       if (!res.ok) throw new Error();
       const data = await res.json();
       const s = data.stats || {};
