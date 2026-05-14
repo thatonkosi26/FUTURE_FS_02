@@ -2,7 +2,7 @@
 
 A professional, full-stack Client Lead Management System built with Node.js, Express, MongoDB, and Vanilla JavaScript. Clean SaaS-style dashboard UI inspired by modern CRM tools.
 
-![ClientIQ Dashboard](./preview.png)
+Live website: https://client-iq.netlify.app/ (please be patient while it loads, the servers were deployed on Render)
 
 ---
 
